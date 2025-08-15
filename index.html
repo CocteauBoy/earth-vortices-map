@@ -7,7 +7,6 @@
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
     crossorigin=""
   />
   <style>
@@ -16,7 +15,7 @@
     .panel {
       position: absolute; top: 10px; left: 10px; z-index: 1000; background: rgba(8,12,24,0.85);
       padding: 12px 14px; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; backdrop-filter: blur(6px);
-      max-width: 360px;
+      max-width: 360px; transition: transform 0.25s ease;
     }
     .title { font-weight: 700; font-size: 16px; margin-bottom: 8px; letter-spacing: 0.3px; }
     .legend-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
@@ -24,16 +23,16 @@
     .chakra-label { flex: 1; font-size: 13px; }
     .toggle { margin-left: 6px; }
     .note { font-size: 12px; color: #aab3c2; margin-top: 8px; line-height: 1.35; }
-    .leaflet-popup-content-wrapper { border-radius: 10px; }
-    .leaflet-popup-content { margin: 8px 12px; }
     .filter-header { font-weight: 600; margin-top: 8px; margin-bottom: 4px; font-size: 13px; color:#cfe5ff; }
     .category { font-size: 12px; color:#c6d0de; margin-bottom: 4px; }
     .credits { position: absolute; right: 10px; bottom: 10px; z-index: 1000; background: rgba(8,12,24,0.75); padding: 6px 10px; border-radius: 10px; font-size: 12px; border: 1px solid rgba(255,255,255,0.08); }
     a, a:visited { color:#a6d3ff; }
+    #togglePanelBtn { position:absolute; top:10px; right:10px; z-index:1001; background:#1c2538; color:#fff; border:none; border-radius:8px; padding:6px 10px; font-size:13px; cursor:pointer; }
   </style>
 </head>
 <body>
-  <div class="panel">
+  <button id="togglePanelBtn">Hide Filters</button>
+  <div class="panel" id="filterPanel">
     <div class="title">Earth Vortices – Primary and Secondary Chakras</div>
     <div class="legend">
       <div class="legend-row"><div class="swatch" style="background:#ff3030"></div><div class="chakra-label">Root</div><input class="toggle" type="checkbox" data-chakra="root" checked/></div>
@@ -52,32 +51,40 @@
   <div id="map"></div>
   <div class="credits">Map tiles © <a href="https://carto.com/" target="_blank" rel="noopener">Carto</a> · Engine © <a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a></div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script>
-    // Chakra color palette
+    // Panel toggle logic
+    document.getElementById('togglePanelBtn').addEventListener('click', function(){
+      const panel = document.getElementById('filterPanel');
+      if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+        this.textContent = 'Hide Filters';
+      } else {
+        panel.style.display = 'none';
+        this.textContent = 'Show Filters';
+      }
+    });
+
+    // Chakra colors
     const CHAKRA_COLORS = {
-      root:   '#ff3030',   // red
-      sacral: '#ff8c1a',   // orange
-      solar:  '#ffd21a',   // yellow
-      heart:  '#20c05a',   // green
-      throat: '#3399ff',   // blue
-      brow:   '#4b36b3',   // indigo
-      crown:  '#7a2bd6'    // violet
+      root:   '#ff3030',
+      sacral: '#ff8c1a',
+      solar:  '#ffd21a',
+      heart:  '#20c05a',
+      throat: '#3399ff',
+      brow:   '#4b36b3',
+      crown:  '#7a2bd6'
     };
 
-    // Utility to build popup HTML
     function popupHtml(node) {
       return `<div style="min-width:220px">`
-        + `<div style="font-weight:700;font-size:14px;margin-bottom:4px">${node.name}</div>`
-        + `<div style="font-size:12px;color:#aab3c2;margin-bottom:6px">${node.level.toUpperCase()} · ${node.chakraLabel}</div>`
-        + (node.notes ? `<div style="font-size:12px;line-height:1.35">${node.notes}</div>` : '')
+        + `<div style=\"font-weight:700;font-size:14px;margin-bottom:4px\">${node.name}</div>`
+        + `<div style=\"font-size:12px;color:#aab3c2;margin-bottom:6px\">${node.level.toUpperCase()} · ${node.chakraLabel}</div>`
+        + (node.notes ? `<div style=\"font-size:12px;line-height:1.35\">${node.notes}</div>` : '')
         + `</div>`;
     }
 
-    // Data: primary and secondary vortices
-    // Coordinates are approximate and for visualization only.
     const nodes = [
-      // Primaries
       { id:'root_primary',    name:'Mount Shasta, United States', lat:41.409, lng:-122.194, chakra:'root', level:'primary', chakraLabel:'Root' },
       { id:'sacral_primary',  name:'Lake Titicaca, Peru–Bolivia', lat:-15.75, lng:-69.42, chakra:'sacral', level:'primary', chakraLabel:'Sacral' },
       { id:'solar_primary',   name:'Uluru–Kata Tjuta, Australia', lat:-25.345, lng:131.036, chakra:'solar', level:'primary', chakraLabel:'Solar' },
@@ -86,27 +93,23 @@
       { id:'brow_primary',    name:'Mount Kailash, Tibet', lat:31.067, lng:81.311, chakra:'brow', level:'primary', chakraLabel:'Brow' },
       { id:'crown_primary',   name:'Sedona, United States', lat:34.869, lng:-111.760, chakra:'crown', level:'primary', chakraLabel:'Crown' },
 
-      // Secondaries – Root
       { id:'crater_lake', name:'Crater Lake, United States', lat:42.944, lng:-122.110, chakra:'root', level:'secondary', chakraLabel:'Root' },
       { id:'black_hills', name:'Black Hills, United States', lat:44.000, lng:-103.500, chakra:'root', level:'secondary', chakraLabel:'Root' },
       { id:'banff', name:'Banff and Lake Louise, Canada', lat:51.178, lng:-115.570, chakra:'root', level:'secondary', chakraLabel:'Root' },
       { id:'fuji', name:'Mount Fuji, Japan', lat:35.3606, lng:138.7274, chakra:'root', level:'secondary', chakraLabel:'Root' },
       { id:'table_mountain', name:'Table Mountain, South Africa', lat:-33.9628, lng:18.4098, chakra:'root', level:'secondary', chakraLabel:'Root' },
 
-      // Secondaries – Sacral
       { id:'iguazu', name:'Iguazu Falls, Argentina–Brazil', lat:-25.695, lng:-54.436, chakra:'sacral', level:'secondary', chakraLabel:'Sacral' },
       { id:'easter_island', name:'Easter Island, Chile', lat:-27.1127, lng:-109.3497, chakra:'sacral', level:'secondary', chakraLabel:'Sacral' },
       { id:'oaxaca', name:'Oaxaca, Mexico', lat:17.073, lng:-96.726, chakra:'sacral', level:'secondary', chakraLabel:'Sacral' },
       { id:'bali', name:'Bali, Indonesia', lat:-8.4095, lng:115.1889, chakra:'sacral', level:'secondary', chakraLabel:'Sacral' },
       { id:'seychelles', name:'Seychelles', lat:-4.6796, lng:55.4920, chakra:'sacral', level:'secondary', chakraLabel:'Sacral' },
 
-      // Secondaries – Solar
       { id:'wollumbin', name:'Wollumbin / Mount Warning, Australia', lat:-28.391, lng:153.271, chakra:'solar', level:'secondary', chakraLabel:'Solar' },
       { id:'adams_peak', name:'Sri Pada / Adam\'s Peak, Sri Lanka', lat:6.8097, lng:80.4992, chakra:'solar', level:'secondary', chakraLabel:'Solar' },
       { id:'canary_islands', name:'Canary Islands', lat:28.293, lng:-16.621, chakra:'solar', level:'secondary', chakraLabel:'Solar', notes:'Linked with submerged Atlantic ridge systems and flows toward Iberia and the Mediterranean.' },
       { id:'mount_kenya', name:'Mount Kenya, Kenya', lat:0.1521, lng:37.3084, chakra:'solar', level:'secondary', chakraLabel:'Solar' },
 
-      // Secondaries – Heart
       { id:'chartres', name:'Chartres Cathedral, France', lat:48.447, lng:1.487, chakra:'heart', level:'secondary', chakraLabel:'Heart' },
       { id:'avebury', name:'Avebury, England', lat:51.428, lng:-1.854, chakra:'heart', level:'secondary', chakraLabel:'Heart' },
       { id:'rosslyn', name:'Rosslyn Chapel, Scotland', lat:55.855, lng:-3.160, chakra:'heart', level:'secondary', chakraLabel:'Heart' },
@@ -115,20 +118,17 @@
       { id:'tuscany', name:'Tuscany Hill Country, Italy', lat:43.467, lng:11.042, chakra:'heart', level:'secondary', chakraLabel:'Heart' },
       { id:'delphi', name:'Delphi, Greece', lat:38.483, lng:22.500, chakra:'heart', level:'secondary', chakraLabel:'Heart' },
 
-      // Secondaries – Throat
       { id:'petra', name:'Petra, Jordan', lat:30.328, lng:35.444, chakra:'throat', level:'secondary', chakraLabel:'Throat' },
       { id:'byblos', name:'Byblos, Lebanon', lat:34.123, lng:35.651, chakra:'throat', level:'secondary', chakraLabel:'Throat' },
       { id:'sinai', name:'Mount Sinai, Egypt', lat:28.539, lng:33.973, chakra:'throat', level:'secondary', chakraLabel:'Throat' },
       { id:'lalibela', name:'Lalibela, Ethiopia', lat:12.031, lng:39.047, chakra:'throat', level:'secondary', chakraLabel:'Throat' },
       { id:'mecca', name:'Mecca, Saudi Arabia', lat:21.389, lng:39.857, chakra:'throat', level:'secondary', chakraLabel:'Throat' },
 
-      // Secondaries – Brow
       { id:'machu_picchu', name:'Machu Picchu, Peru', lat:-13.163, lng:-72.545, chakra:'brow', level:'secondary', chakraLabel:'Brow' },
       { id:'angkor', name:'Angkor Wat, Cambodia', lat:13.412, lng:103.867, chakra:'brow', level:'secondary', chakraLabel:'Brow' },
       { id:'olympus', name:'Mount Olympus, Greece', lat:40.085, lng:22.358, chakra:'brow', level:'secondary', chakraLabel:'Brow' },
       { id:'athos', name:'Mount Athos, Greece', lat:40.158, lng:24.326, chakra:'brow', level:'secondary', chakraLabel:'Brow' },
 
-      // Secondaries – Crown
       { id:'taos', name:'Taos Mountain, United States', lat:36.494, lng:-105.544, chakra:'crown', level:'secondary', chakraLabel:'Crown' },
       { id:'chaco', name:'Chaco Canyon, United States', lat:36.060, lng:-107.969, chakra:'crown', level:'secondary', chakraLabel:'Crown' },
       { id:'monument_valley', name:'Monument Valley, United States', lat:36.998, lng:-110.098, chakra:'crown', level:'secondary', chakraLabel:'Crown' },
@@ -136,7 +136,6 @@
       { id:'haleakala', name:'Haleakalā, Maui, United States', lat:20.709, lng:-156.253, chakra:'crown', level:'secondary', chakraLabel:'Crown' }
     ];
 
-    // Define connections: primary to each secondary of the same chakra
     const links = [];
     const primaryByChakra = {
       root: 'root_primary',
@@ -154,16 +153,13 @@
       }
     });
 
-    // Optionally connect primary to primary in a simple ring to suggest global flow
     const primaryIds = Object.values(primaryByChakra);
     for (let i = 0; i < primaryIds.length; i++) {
       const a = primaryIds[i];
       const b = primaryIds[(i + 1) % primaryIds.length];
-      // Use heart color for the global ring to suggest integration
       links.push({ source: a, target: b, chakra: 'heart', meta:'primary-ring' });
     }
 
-    // Leaflet map init
     const map = L.map('map', { worldCopyJump: true, minZoom: 2 });
     const tiles = L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png', {
       attribution: '&copy; Carto',
@@ -173,20 +169,17 @@
 
     map.setView([20, 0], 2);
 
-    // Marker and polyline layers by chakra
-    const nodeLayers = {};   // chakra -> L.LayerGroup
-    const linkLayers = {};   // chakra -> L.LayerGroup
+    const nodeLayers = {};
+    const linkLayers = {};
 
     Object.keys(CHAKRA_COLORS).forEach(ch => {
       nodeLayers[ch] = L.layerGroup().addTo(map);
       linkLayers[ch] = L.layerGroup().addTo(map);
     });
 
-    // Store references for interactivity
-    const markerById = {};        // id -> marker
-    const linksByNode = {};       // id -> [polyline]
+    const markerById = {};
+    const linksByNode = {};
 
-    // Build markers
     nodes.forEach(n => {
       const color = CHAKRA_COLORS[n.chakra];
       const marker = L.circleMarker([n.lat, n.lng], {
@@ -195,19 +188,16 @@
         weight: n.level === 'primary' ? 2.5 : 1.5,
         fillColor: color,
         fillOpacity: n.level === 'primary' ? 0.65 : 0.45
-      })
-      .bindPopup(popupHtml(n));
+      }).bindPopup(popupHtml(n));
 
       marker.addTo(nodeLayers[n.chakra]);
       markerById[n.id] = marker;
       linksByNode[n.id] = [];
 
-      // Hover highlight
       marker.on('mouseover', () => highlightConnections(n.id));
       marker.on('mouseout', clearHighlights);
     });
 
-    // Build polylines
     links.forEach(l => {
       const a = nodes.find(n => n.id === l.source);
       const b = nodes.find(n => n.id === l.target);
@@ -219,20 +209,13 @@
         opacity: 0.35
       }).addTo(linkLayers[l.chakra]);
 
-      // Cross reference for hover behavior
       linksByNode[a.id].push(line);
       linksByNode[b.id].push(line);
 
-      // Hover effect on the line itself
-      line.on('mouseover', () => {
-        line.setStyle({ weight: 4, opacity: 0.9 });
-      });
-      line.on('mouseout', () => {
-        line.setStyle({ weight: l.meta === 'primary-ring' ? 1.75 : 1.5, opacity: 0.35 });
-      });
+      line.on('mouseover', () => { line.setStyle({ weight: 4, opacity: 0.9 }); });
+      line.on('mouseout', () => { line.setStyle({ weight: l.meta === 'primary-ring' ? 1.75 : 1.5, opacity: 0.35 }); });
     });
 
-    // Hover highlight logic
     function highlightConnections(nodeId) {
       const lines = linksByNode[nodeId] || [];
       lines.forEach(pl => pl.setStyle({ weight: 4, opacity: 0.9 }));
@@ -246,7 +229,6 @@
       });
     }
 
-    // Chakra toggle controls
     document.querySelectorAll('.toggle').forEach(cb => {
       cb.addEventListener('change', e => {
         const chakra = e.target.getAttribute('data-chakra');
@@ -261,7 +243,6 @@
       });
     });
 
-    // Category toggles
     const togglePrimaries = document.getElementById('togglePrimaries');
     const toggleSecondaries = document.getElementById('toggleSecondaries');
 
@@ -276,9 +257,7 @@
           nodeLayers[n.chakra].removeLayer(m);
         }
       });
-      // Also show or hide primary ring lines
       linkLayers['heart'].eachLayer(pl => {
-        // crude heuristic: primary ring lines were added last in heart layer with weight 1.75
         if (pl && pl.options && pl.options.weight === 1.75) {
           if (show) { linkLayers['heart'].addLayer(pl); } else { linkLayers['heart'].removeLayer(pl); }
         }
@@ -297,10 +276,8 @@
         }
       });
 
-      // show or hide secondary connection lines
       Object.keys(linkLayers).forEach(ch => {
         linkLayers[ch].eachLayer(pl => {
-          // secondary connections have default weight 1.5
           if (pl && pl.options && pl.options.weight === 1.5) {
             if (show) { linkLayers[ch].addLayer(pl); } else { linkLayers[ch].removeLayer(pl); }
           }
@@ -308,9 +285,9 @@
       });
     });
 
-    // Fit bounds to all nodes
     const bounds = L.latLngBounds(nodes.map(n => [n.lat, n.lng]));
     map.fitBounds(bounds.pad(0.25));
   </script>
 </body>
 </html>
+
